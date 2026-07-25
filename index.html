@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>9100 PRO Global Signal Radar — SEED</title>
+<title>9100 PRO Global Signal Radar — LIVE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -196,23 +196,23 @@ footer{max-width:1240px;margin:10px auto 0;padding:16px 20px 30px;font-size:11px
       <button id="tabExec" class="on" onclick="setView('exec')">경영진 Overview</button>
       <button id="tabWb" onclick="setView('wb')">분석가 Workbench</button>
     </div>
-    <div class="seed-badge" title="공개 게시글을 수동 검증한 스냅샷입니다">SEED · 수동검증 07-23</div>
+    <div id="dataBadge" class="seed-badge" title="데이터 소스 상태">연결 중…</div>
   </div>
   <div class="rail" aria-label="시스템 상태">
-    <span><b>PROTOTYPE MODE</b> · 자동 수집 커넥터 미연결</span>
-    <span>BUILD <b>r6 · 07.23</b></span>
-    <span>마지막 수동 검증: <b>2026-07-23</b></span>
-    <span>데이터: <b>실제 공개 게시글 기반 스냅샷</b> (라이브 아님)</span>
+    <span id="railMode"><b>CONNECTING</b> · 데이터 확인 중</span>
+    <span>BUILD <b>r8 · 07.25</b></span>
+    <span id="railLast">마지막 수집: <b>확인 중…</b></span>
+    <span id="railSrc">데이터: <b>확인 중…</b></span>
     <span class="lamp"><i class="dot man"></i>Samsung Community (수동)</span>
     <span class="lamp"><i class="dot man"></i>Intel · ROG Forum (수동)</span>
     <span class="lamp"><i class="dot man"></i>매체 리뷰 (수동)</span>
-    <span class="lamp"><i class="dot off"></i>Reddit API</span>
+    <span class="lamp" id="lampReddit"><i class="dot off"></i>Reddit (공개 RSS)</span>
     <span class="lamp"><i class="dot blk"></i>Retail / X: POLICY_BLOCKED</span>
   </div>
 </header>
 
 <main>
-  <div class="notice">모든 사례는 <b>2026-07-23 수동 검증한 실제 공개 게시글</b>에 기반한 스냅샷입니다. 각 사례의 <b>↗ 버튼 또는 상세 화면의 "원문 페이지 열기"</b>를 누르면 실제 웹사이트에서 작성자의 전체 워딩을 확인할 수 있습니다. 앱에는 짧은 발췌만 저장합니다(수집 원칙·저작권). 모든 항목은 사용자 제보이며 확인된 제품 결함이 아닙니다.</div>
+  <div class="notice">모든 사례는 <b>실제 공개 게시글</b>에 기반합니다 — 초기 20건은 수동 검증(2026-07-23), 이후 사례는 <b>자동 수집 + AI 분류</b>로 추가됩니다. 각 사례의 <b>↗ 버튼 또는 상세 화면의 "원문 페이지 열기"</b>를 누르면 실제 웹사이트에서 작성자의 전체 워딩을 확인할 수 있습니다. 앱에는 짧은 발췌만 저장합니다(수집 원칙·저작권). <b>모든 항목은 미검증 사용자 제보이며 확인된 제품 결함이 아닙니다.</b></div>
 
   <div class="p0">
     <span class="tag">P0 후보</span>
@@ -225,14 +225,14 @@ footer{max-width:1240px;margin:10px auto 0;padding:16px 20px 30px;font-size:11px
 
   <div id="viewExec">
     <section>
-      <h2>핵심 지표 <span class="sub">수동 검증 스냅샷 · 2026-07-23</span></h2>
+      <h2>핵심 지표 <span class="sub" id="kpiSub">데이터 확인 중…</span></h2>
       <div class="kpis">
-        <div class="kpi"><div class="lb">검증된 스레드</div><div class="v">13</div><div class="d">전건 원문 URL 연결</div></div>
-        <div class="kpi"><div class="lb">고유 사례</div><div class="v">20</div><div class="d">동일 스레드 내 중복 제외</div></div>
-        <div class="kpi crit"><div class="lb">FW 연관 독립 제보 72h</div><div class="v">9+</div><div class="d">관찰 게시글 12건 이상</div></div>
-        <div class="kpi crit"><div class="lb">P0 후보 클러스터</div><div class="v">1</div><div class="d">사람 검토 대기</div></div>
-        <div class="kpi"><div class="lb">플랫폼 원인 가능성 비중</div><div class="v">44%</div><div class="d">보드 BIOS·슬롯·CPU 요인</div></div>
-        <div class="kpi"><div class="lb">공식·모더레이터 답변</div><div class="v">4</div><div class="d">ASUS 조사 진행 포함</div></div>
+        <div class="kpi"><div class="lb">관찰 게시글</div><div class="v" id="kpiPosts">–</div><div class="d">전건 원문 URL 연결</div></div>
+        <div class="kpi"><div class="lb">고유 사례</div><div class="v" id="kpiCases">–</div><div class="d">동일 스레드 내 중복 제외</div></div>
+        <div class="kpi crit"><div class="lb">FW 1B2QNXH7 연관</div><div class="v" id="kpiFw">–</div><div class="d">펌웨어 연관 주장 사례</div></div>
+        <div class="kpi crit"><div class="lb">고심각도 (Sev 4+)</div><div class="v" id="kpiSev">–</div><div class="d">사람 검토 대기</div></div>
+        <div class="kpi"><div class="lb">플랫폼 원인 가능성 비중</div><div class="v" id="kpiPlat">–</div><div class="d">보드 BIOS·슬롯·CPU 요인</div></div>
+        <div class="kpi"><div class="lb">공식·모더레이터 답변</div><div class="v" id="kpiOfficial">–</div><div class="d">evidence = 공식 답변 존재</div></div>
       </div>
     </section>
 
@@ -305,7 +305,7 @@ footer{max-width:1240px;margin:10px auto 0;padding:16px 20px 30px;font-size:11px
 </aside>
 
 <footer>
-  9100 PRO Global Signal Radar · SEED SNAPSHOT (수동 검증 2026-07-23) · Phase 1 프로토타입<br>
+  9100 PRO Global Signal Radar · <span id="footMode">Phase 2 · 자동 수집</span><br>
   본 도구는 공개 웹 데이터 리서치 목적의 비공식 도구이며 삼성전자의 공식 서비스가 아닙니다. 모든 항목은 미검증 사용자 제보 또는 매체 관찰이며, 확인된 제품 결함·펌웨어 결함을 의미하지 않습니다. 게시글 수는 불량률이 아닙니다. PUBLIC_DATA_ONLY — 사내·고객 비공개 데이터를 입력하지 마십시오.
   <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
     <span>Designed &amp; Curated by <b style="color:var(--ink2)">복부인</b></span>
@@ -326,7 +326,8 @@ const CATS = {
 };
 const EVID = {u:"미검증 보고",m:"복수 출처 관찰",r:"재현 정보 포함",p:"플랫폼 원인 가능성",o:"공식 답변 존재",x:"해결·오분류",v:"매체 관찰"};
 
-const CASES = [
+/* LIVE 모드에서 Supabase 데이터로 교체됨. 연결 실패 시 아래 SEED가 폴백으로 사용됨. */
+let CASES = [
 /* ── CL-FW: 펌웨어 1B2QNXH7 업데이트 후 소실 (하이라이트) ── */
  {id:"RC-101",fw1b:true,cluster:"CL-FW",cat:"G1",sev:4,evidence:"o",region:"미국(커뮤니티)",cap:"8TB",fw:"0B2QNXH7→1B2QNXH7",plat:"HP Z6 등",posts:6,date:"2026-07-21",title:"Magician으로 1B2QNXH7 업데이트 중 PC 자동 종료 후 드라이브 완전 미인식",
   q:"the drive was gone—it didn't show up in the BIOS",qsite:"Samsung Community US",
@@ -454,7 +455,7 @@ const CASES = [
   src:"https://forums.tomshardware.com/threads/extremely-slow-random-writes-on-samsung-990-pro-nvme.3877286/"}
 ];
 
-const CLUSTERS = [
+let CLUSTERS = [
  {id:"CL-FW",name:"펌웨어 1B2QNXH7 업데이트 후 소실·Gen5 미인식",code:"G1 · A1 · A5",sev:4,fw:true,unv:true,trend:[0,0,0,0,0,0,0,0,0,0,1,3,4,4]},
  {id:"CL-STAB",name:"BSOD 후 BIOS 소실 · 콜드부트 복구 (fTPM 연관)",code:"C1 · A4 · G3",sev:4,unv:true,trend:[0,0,1,0,1,0,1,1,0,1,1,1,1,1]},
  {id:"CL-G5",name:"AM5 ITX 보드 Gen5 미인식 · Gen4 전환 시 안정",code:"A1 · H1 · H13",sev:3,plat:true,trend:[1,2,1,2,2,1,2,1,2,1,1,1,1,1]},
@@ -596,7 +597,7 @@ function openDrawer(id,push=true){
         ${sevChip(c.sev)}${evChip(c.evidence)}
         ${c.fw1b?fwChip():''}
         ${c.platWide?'<span class="chip c-plat">PLATFORM_WIDE_SUSPECT</span>':''}
-        <span class="chip c-real">REAL SOURCE · 수동검증 07-23</span>
+        <span class="chip c-real">${c.demo===false?'REAL SOURCE · AI 자동분류':'REAL SOURCE · 수동검증 07-23'}</span>
       </div>
     </div>
     ${c.q?`<div class="dw-sec"><h5>원문 발췌 — 작성자 워딩 그대로</h5>
@@ -604,7 +605,7 @@ function openDrawer(id,push=true){
     </div>`:''}
     ${c.fw1b?'<div class="dw-sec"><div class="warnbox">펌웨어 1B2QNXH7 업데이트 연관 P0 후보 클러스터의 사례입니다. 미검증 사용자 제보이며, 독립 확증과 사람 검토·공식 확인 전에는 결함으로 표시하지 않습니다.</div></div>':''}
     <div class="dw-sec"><h5>사례 정보</h5><div class="kv">
-      <span class="k">사례 ID</span><span class="v mono">${c.id} (${c.cluster})</span>
+      <span class="k">사례 ID</span><span class="v mono">${c.id}${c.cluster&&c.cluster!=="미분류"?` (${c.cluster})`:''}</span>
       <span class="k">분류</span><span class="v">${c.cat} — ${CATS[c.cat]}</span>
       <span class="k">지역(추정)</span><span class="v">${c.region}</span>
       <span class="k">용량</span><span class="v">${c.cap}</span>
@@ -617,10 +618,10 @@ function openDrawer(id,push=true){
     <div class="dw-sec"><h5>Claims — 주장·관찰·답변 분리 (요지 재서술)</h5>
       ${c.claims.map(cl=>`<div class="claim ${cl.crit?'crit':''}"><div class="ct">${cl.t}</div><p>${cl.txt}</p></div>`).join("")}
     </div>
-    <div class="dw-sec"><h5>원인 가설 (확정 아님)</h5>
+    ${c.hyps.length?`<div class="dw-sec"><h5>원인 가설 (확정 아님)</h5>
       ${c.hyps.map(h=>`<div class="hyp"><span class="p">${h[0]}</span><span>${h[1]}</span></div>`).join("")}
-    </div>
-    <div class="dw-sec"><h5>반증·현황</h5><p style="font-size:12.5px">${c.counter}</p></div>
+    </div>`:''}
+    ${c.counter?`<div class="dw-sec"><h5>반증·현황</h5><p style="font-size:12.5px">${c.counter}</p></div>`:''}
     <div class="dw-sec"><h5>Evidence — 원문 URL</h5>
       <a class="src" href="${c.src}" target="_blank" rel="noopener">${c.src}</a>
       <p style="font-size:11px;color:var(--ink3);margin-top:6px">앱에는 짧은 발췌만 저장하며 전문은 원문 페이지에서 확인합니다(수집 원칙·저작권). 사용자명은 표시하지 않습니다. 게시글은 삭제·수정될 수 있습니다.</p>
@@ -655,7 +656,7 @@ function exportCSV(){
   const rows=filtered();
   const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
   const head=["case_id","cluster","fw_1b2qnxh7_related","title","category","category_name","severity","evidence_level","region_estimated","capacity","firmware","platform","observed_posts_min","last_seen","verbatim_excerpt","source_site","source_url","data_status"];
-  const csv=[head.join(",")].concat(rows.map(c=>[c.id,c.cluster,c.fw1b?"TRUE":"FALSE",c.title,c.cat,CATS[c.cat],c.sev,EVID[c.evidence],c.region,c.cap,c.fw,c.plat,c.posts,c.date,c.q||"",c.qsite||"",c.src,"REAL_SOURCE_MANUAL_SNAPSHOT_2026-07-23"].map(esc).join(","))).join("\r\n");
+  const csv=[head.join(",")].concat(rows.map(c=>[c.id,c.cluster,c.fw1b?"TRUE":"FALSE",c.title,c.cat,CATS[c.cat],c.sev,EVID[c.evidence],c.region,c.cap,c.fw,c.plat,c.posts,c.date,c.q||"",c.qsite||"",c.src,c.demo===false?"REAL_SOURCE_AUTO_COLLECTED_AI_CLASSIFIED":"REAL_SOURCE_MANUAL_SNAPSHOT_2026-07-23"].map(esc).join(","))).join("\r\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
@@ -663,9 +664,120 @@ function exportCSV(){
   a.click(); URL.revokeObjectURL(a.href);
 }
 
-fillOptions(); renderExec(); render();
-replaceHash(location.hash||"#exec");
-applyRoute(location.hash||"#exec");
+/* ══════════════════════════════════════════════════════════════════
+   LIVE 데이터 연결 (Phase 2 · Step 4)
+   - Supabase에서 cases / clusters / 마지막 수집 시각을 읽어옴
+   - 공개(publishable) 키 + RLS 읽기 전용 — posts·model_runs는 접근 불가
+   - 실패 시 위의 SEED 데이터로 자동 폴백 (화면은 항상 렌더링됨)
+   ══════════════════════════════════════════════════════════════════ */
+const SB_URL = "https://kryouhhdmbfhwhwkxnjw.supabase.co";
+const SB_KEY = "sb_publishable_b3gMqIxwGmxtvms9wi3euQ_5rFR-cxo";
+const STALE_HOURS = 14;   // 하루 2회 수집(12시간 간격) + 2시간 여유
+
+async function sbGet(path){
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, {headers:{apikey:SB_KEY, Authorization:`Bearer ${SB_KEY}`}});
+  if(!r.ok) throw new Error(`${path} → HTTP ${r.status}`);
+  return r.json();
+}
+
+/* DB 컬럼 → 화면이 쓰는 필드명으로 변환 */
+function mapCase(r){
+  return {
+    id:r.id, cluster:r.cluster||"미분류", cat:r.cat, sev:r.sev, evidence:r.evidence,
+    region:r.region||"미상", cap:r.cap||"미상", fw:r.fw||"미상",
+    mk:r.mk, cs:r.cs, bios:r.bios, plat:r.plat||"미상",
+    title:r.title, counter:r.counter||"", q:r.q||"", qsite:r.qsite||"", src:r.src,
+    demo:!!r.demo,
+    fw1b:!!r.fw1b, platWide:!!r.plat_wide,
+    posts:r.posts_count ?? 0, date:r.last_seen || "",
+    claims:Array.isArray(r.claims)?r.claims:[],
+    hyps:Array.isArray(r.hyps)?r.hyps:[]
+  };
+}
+
+function setStatus(mode, lastRun, count){
+  const badge=$("dataBadge"), mo=$("railMode"), la=$("railLast"), sr=$("railSrc"), lamp=$("lampReddit");
+  const fmt = d => d ? d.toLocaleString("ko-KR",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}) : "기록 없음";
+  const ago = d => { if(!d) return ""; const m=Math.round((Date.now()-d)/60000);
+    return m<60 ? ` (${m}분 전)` : ` (${Math.floor(m/60)}시간 전)`; };
+
+  if(mode==="LIVE"){
+    badge.textContent=`LIVE · ${count}건`; badge.style.background="#0d3b2e"; badge.style.color="#4ade80"; badge.style.borderColor="#166534";
+    badge.title="Supabase에서 실시간으로 읽어온 데이터입니다";
+    mo.innerHTML="<b>LIVE MODE</b> · 자동 수집 가동 중 (하루 2회)";
+    la.innerHTML=`마지막 수집: <b>${fmt(lastRun)}${ago(lastRun)}</b>`;
+    sr.innerHTML="데이터: <b>자동 수집 + AI 분류</b> (미검증 제보)";
+    lamp.querySelector("i").className="dot man";
+    $("kpiSub").textContent=`LIVE · ${count}개 사례 · ${fmt(lastRun)} 기준`;
+    $("footMode").textContent="Phase 2 · 자동 수집 + AI 분류 (LIVE)";
+  } else if(mode==="STALE"){
+    badge.textContent=`STALE · ${count}건`; badge.style.background="#3b2f0d"; badge.style.color="#fbbf24"; badge.style.borderColor="#78350f";
+    badge.title=`마지막 수집이 ${STALE_HOURS}시간을 넘었습니다 — 데이터가 최신이 아닐 수 있습니다`;
+    mo.innerHTML="<b>STALE</b> · 최근 수집이 지연됨";
+    la.innerHTML=`마지막 수집: <b>${fmt(lastRun)}${ago(lastRun)}</b>`;
+    sr.innerHTML="데이터: <b>자동 수집 (지연)</b> — 최신이 아닐 수 있음";
+    lamp.querySelector("i").className="dot off";
+    $("kpiSub").textContent=`STALE · ${count}개 사례 · ${fmt(lastRun)} 기준`;
+    $("footMode").textContent="Phase 2 · 자동 수집 (수집 지연 상태)";
+  } else {
+    badge.textContent="OFFLINE · 내장 스냅샷"; badge.style.background="#3b0d0d"; badge.style.color="#fca5a5"; badge.style.borderColor="#7f1d1d";
+    badge.title="데이터베이스에 연결하지 못해 내장된 수동 검증 스냅샷을 표시합니다";
+    mo.innerHTML="<b>OFFLINE</b> · DB 연결 실패 — 내장 스냅샷 표시";
+    la.innerHTML="마지막 수집: <b>알 수 없음</b>";
+    sr.innerHTML="데이터: <b>내장 스냅샷</b> (2026-07-23 수동 검증)";
+    lamp.querySelector("i").className="dot off";
+    $("kpiSub").textContent="OFFLINE · 내장 스냅샷 (2026-07-23 수동 검증)";
+    $("footMode").textContent="OFFLINE · 내장 스냅샷 표시 중";
+  }
+}
+
+/* 핵심 지표를 현재 CASES에서 실시간 계산 */
+function computeKPIs(){
+  const n = CASES.length;
+  const posts = CASES.reduce((a,c)=>a+(c.posts||0),0);
+  const fw = CASES.filter(c=>c.fw1b).length;
+  const sev4 = CASES.filter(c=>c.sev>=4).length;
+  const platCats = ["H1","H4","H13","A5"];
+  const plat = CASES.filter(c=>c.platWide || platCats.includes(c.cat)).length;
+  const official = CASES.filter(c=>c.evidence==="o").length;
+  $("kpiPosts").textContent = posts;
+  $("kpiCases").textContent = n;
+  $("kpiFw").textContent = fw;
+  $("kpiSev").textContent = sev4;
+  $("kpiPlat").textContent = n ? Math.round(plat/n*100)+"%" : "–";
+  $("kpiOfficial").textContent = official;
+}
+
+async function loadLive(){
+  try{
+    const [cs, cl, runs] = await Promise.all([
+      sbGet("cases?select=*&order=sev.desc,last_seen.desc"),
+      sbGet("clusters?select=*"),
+      sbGet("collection_runs?select=finished,started&order=run_id.desc&limit=1")
+    ]);
+    if(!cs.length) throw new Error("사례 0건");
+
+    CASES = cs.map(mapCase);
+    /* 클러스터: DB에는 화면용 code/trend가 없으므로 SEED 정의를 유지하되 DB에만 있는 항목을 추가 */
+    const seen=new Set(CLUSTERS.map(c=>c.id));
+    cl.forEach(c=>{ if(!seen.has(c.id)) CLUSTERS.push({id:c.id,name:c.name,code:c.summary||"",sev:1,trend:new Array(14).fill(0)}); });
+
+    const t = runs[0] && (runs[0].finished || runs[0].started);
+    const lastRun = t ? new Date(t) : null;
+    const stale = !lastRun || (Date.now()-lastRun) > STALE_HOURS*3600e3;
+    setStatus(stale?"STALE":"LIVE", lastRun, CASES.length);
+  }catch(e){
+    console.warn("[9100-radar] LIVE 연결 실패 — 내장 스냅샷 사용:", e.message);
+    setStatus("OFFLINE", null, CASES.length);
+  }
+  /* 성공·실패 무관하게 항상 렌더링 */
+  computeKPIs();
+  fillOptions(); renderExec(); render();
+  replaceHash(location.hash||"#exec");
+  applyRoute(location.hash||"#exec");
+}
+
+loadLive();
 </script>
 </body>
 </html>

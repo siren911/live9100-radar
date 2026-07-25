@@ -248,7 +248,9 @@ for (const post of posts) {
       region: s2.region || '미상', cap: s2.cap || '미상', fw: s2.fw || '미상',
       mk: s2.mk || null, cs: s2.cs || null, bios: s2.bios || null, plat: s2.plat || null,
       title: s2.title_ko || post.title.slice(0, 60),
-      claims: [['u', s2.claim || '']], hyps: s2._s3note ? [['—', s2._s3note]] : [],
+      // 대시보드 렌더링 규격: claims = [{t,crit,txt}], hyps = [[라벨, 설명]]
+      claims: [{ t: '사용자 주장 (요지)', crit: s2.sev >= 4 ? 1 : 0, txt: s2.claim || '' }],
+      hyps: s2._s3note ? [['—', s2._s3note]] : [],
       q: s2.quote || '', qsite: post.meta?.subreddit || post.meta?.feed || 'web',
       src: post.url, fw1b: !!s2.fw1b, plat_wide: false,
       posts_count: 1, last_seen: (post.posted_at || new Date().toISOString()).slice(0, 10),
