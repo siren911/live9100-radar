@@ -14,12 +14,14 @@ import { dirname, join } from 'node:path';
 const __dir = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dir, '..');
 
-// --- .env 로드 ---
-const env = {};
-for (const line of readFileSync(join(ROOT, '.env'), 'utf8').split('\n')) {
-  const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);
-  if (m) env[m[1]] = m[2].trim();
-}
+// --- .env 로드 (GitHub Actions에서는 환경변수로 직접 주입됨) ---
+const env = { ...process.env };
+try {
+  for (const line of readFileSync(join(ROOT, '.env'), 'utf8').split('\n')) {
+    const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);
+    if (m && !env[m[1]]) env[m[1]] = m[2].trim();
+  }
+} catch { /* .env 없으면 환경변수만 사용 (Actions 환경) */ }
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE, ANTHROPIC_API_KEY } = env;
 const BUDGET = parseFloat(env.MONTHLY_AI_BUDGET || '20');
 if (!ANTHROPIC_API_KEY) { console.error('❌ .env에 ANTHROPIC_API_KEY가 없습니다'); process.exit(1); }

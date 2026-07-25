@@ -1,0 +1,40 @@
+# =====================================================================
+# 9100-radar 자동 수집·검수 (Step 4)
+# 스케줄: 한국시간 낮 12시 / 밤 12시 (UTC 03:00, 15:00) — 하루 2회
+# 수동 실행: Actions 탭 → "collect" → Run workflow 버튼
+# =====================================================================
+name: collect
+
+on:
+  schedule:
+    - cron: '0 3 * * *'    # 12:00 KST (낮)
+    - cron: '0 15 * * *'   # 00:00 KST (밤)
+  workflow_dispatch: {}     # 수동 실행 버튼
+
+concurrency:
+  group: collect            # 겹쳐 실행 방지
+  cancel-in-progress: false
+
+jobs:
+  collect-and-classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      MONTHLY_AI_BUDGET: '20'
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설치
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 1) 수집 로봇 출근 (Reddit + RSS)
+        run: node collector/collect.mjs
+
+      - name: 2) AI 검수원 출근 (Haiku→Sonnet→Opus)
+        run: node collector/classify.mjs
