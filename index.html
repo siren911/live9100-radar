@@ -227,7 +227,7 @@ footer{max-width:1240px;margin:10px auto 0;padding:16px 20px 30px;font-size:11px
     <section>
       <h2>핵심 지표 <span class="sub" id="kpiSub">데이터 확인 중…</span></h2>
       <div class="kpis">
-        <div class="kpi"><div class="lb">관찰 게시글</div><div class="v" id="kpiPosts">–</div><div class="d">전건 원문 URL 연결</div></div>
+        <div class="kpi"><div class="lb">누적 관찰 게시글</div><div class="v" id="kpiPosts">–</div><div class="d" id="kpiPostsSub">수동검증 + 자동수집 합산</div></div>
         <div class="kpi"><div class="lb">고유 사례</div><div class="v" id="kpiCases">–</div><div class="d">동일 스레드 내 중복 제외</div></div>
         <div class="kpi crit"><div class="lb">FW 1B2QNXH7 연관</div><div class="v" id="kpiFw">–</div><div class="d">펌웨어 연관 주장 사례</div></div>
         <div class="kpi crit"><div class="lb">고심각도 (Sev 4+)</div><div class="v" id="kpiSev">–</div><div class="d">사람 검토 대기</div></div>
@@ -238,6 +238,7 @@ footer{max-width:1240px;margin:10px auto 0;padding:16px 20px 30px;font-size:11px
 
     <section>
       <h2>이슈 클러스터 <span class="sub">카드를 누르면 분석가 화면에서 해당 사례로 이동</span></h2>
+      <div class="notice" id="trendNote" style="margin:0 0 12px;font-size:12px"></div>
       <div class="clusters" id="clusterGrid"></div>
     </section>
 
@@ -521,6 +522,15 @@ function renderExec(){
       <i class="${hot?'hot':''}" style="height:${h}px"></i>
     </span>`;
   };
+  /* 두 숫자의 의미 차이를 명시 — 그래프가 '이슈 감소'로 오독되지 않도록 */
+  const declaredAll = CASES.reduce((a,c)=>a+(c.posts||0),0);
+  const collectedAll = CLUSTER_DAILY
+    ? Object.values(CLUSTER_DAILY).reduce((a,m)=>a+Object.values(m).reduce((x,y)=>x+y,0),0) : 0;
+  $("trendNote").innerHTML = CLUSTER_DAILY
+    ? `⚠️ <b>막대그래프는 자동 수집분(${collectedAll}건)만 표시합니다.</b> 카드의 <b>누적 관찰 ${declaredAll}건</b>에는 2026-07-23 사람이 직접 확인한 제보가 포함되는데,
+       그 건들은 개별 원문 기록이 없어 그래프에 그려지지 않습니다(자동 수집 시작: 2026-07-24). <b>막대가 낮다고 이슈가 줄어든 것이 아닙니다</b> — 자동 수집 이력이 쌓이면서 채워집니다.`
+    : `내장 스냅샷(2026-07-23 수동 검증) 기준 추이입니다. 실시간 집계가 아닙니다.`;
+
   $("clusterGrid").innerHTML = CLUSTERS.map(c=>{
     const {days, vals} = trendOf(c.id);
     const w1=vals.slice(0,7), w2=vals.slice(7,14);
@@ -538,7 +548,7 @@ function renderExec(){
         <div class="grp" style="flex:7">${w2.map((v,i)=>bar(v,i+7,max)).join("")}</div>
       </div>
       <div class="wk"><span style="flex:7">${lbl1}</span><span style="flex:7">${lbl2} (오늘)</span></div>
-      <div class="stat"><span>고유 사례 ${n} · 관찰 게시글 ${p}+</span><span>${CLUSTER_DAILY?`최근 14일 제보 ${total}건`:'일별 집계 · 스냅샷'}</span></div>
+      <div class="stat"><span>고유 사례 ${n} · 누적 관찰 ${p}건</span><span>${CLUSTER_DAILY?`그래프=자동수집 ${total}건`:'일별 집계 · 스냅샷'}</span></div>
     </div>`;
   }).join("");
 
@@ -767,6 +777,10 @@ function computeKPIs(){
   const plat = CASES.filter(c=>c.platWide || platCats.includes(c.cat)).length;
   const official = CASES.filter(c=>c.evidence==="o").length;
   $("kpiPosts").textContent = posts;
+  if(CLUSTER_DAILY){
+    const auto = Object.values(CLUSTER_DAILY).reduce((a,m)=>a+Object.values(m).reduce((x,y)=>x+y,0),0);
+    $("kpiPostsSub").textContent = `수동검증 ${posts-auto}건 + 자동수집 ${auto}건`;
+  }
   $("kpiCases").textContent = n;
   $("kpiFw").textContent = fw;
   $("kpiSev").textContent = sev4;
