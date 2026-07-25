@@ -309,7 +309,7 @@ footer{max-width:1240px;margin:10px auto 0;padding:16px 20px 30px;font-size:11px
   본 도구는 공개 웹 데이터 리서치 목적의 비공식 도구이며 삼성전자의 공식 서비스가 아닙니다. 모든 항목은 미검증 사용자 제보 또는 매체 관찰이며, 확인된 제품 결함·펌웨어 결함을 의미하지 않습니다. 게시글 수는 불량률이 아닙니다. PUBLIC_DATA_ONLY — 사내·고객 비공개 데이터를 입력하지 마십시오.
   <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
     <span>Designed &amp; Curated by <b style="color:var(--ink2)">복부인</b></span>
-    <span class="mono">2026.07.23</span>
+    <span class="mono" id="footDate">—</span>
   </div>
 </footer>
 
@@ -486,12 +486,35 @@ function sevChip(s){return `<span class="chip c-sev${s}">Sev ${s}</span>`}
 function evChip(e){return `<span class="chip c-ev">${EVID[e]}</span>`}
 function fwChip(){return `<span class="chip c-fw">FW 1B2QNXH7</span>`}
 
+/* ── 최근 14일 롤링 윈도우 (오늘 기준 자동 갱신) ──────────────────
+   LIVE: cluster_daily 뷰의 실제 집계를 사용
+   OFFLINE: 폴백으로 SEED의 고정 trend 배열 사용 */
+let CLUSTER_DAILY = null;          // { "CL-FW": {"2026-07-20":3, …}, … } · null이면 SEED 모드
+
+/* 집계 기준 시간대 = Asia/Seoul (수집 스케줄·DB 뷰와 동일).
+   보는 사람의 위치와 무관하게 항상 한국시간 기준 날짜로 맞춘다. */
+const TZ = "Asia/Seoul";
+const ymdKST = d => d.toLocaleDateString("sv-SE", { timeZone: TZ });   // "2026-07-25"
+function windowDays(n=14){
+  const out=[], now=new Date();
+  for(let i=n-1;i>=0;i--) out.push(new Date(now.getTime() - i*864e5));
+  return out;
+}
+function trendOf(clusterId){
+  const days = windowDays(14);
+  if(CLUSTER_DAILY){
+    const m = CLUSTER_DAILY[clusterId] || {};
+    return { days, vals: days.map(d=>m[ymdKST(d)] || 0) };
+  }
+  const c = CLUSTERS.find(x=>x.id===clusterId);
+  return { days, vals: (c && c.trend) ? c.trend.slice(0,14) : new Array(14).fill(0) };
+}
+const md = d => ymdKST(d).slice(5).replace("-", ".");     // "07.25"
+
 function renderExec(){
-  /* trend[0]=07-10 … trend[13]=07-23(스냅샷일).
-     달력 주차(월~일): 1주차 = 07.13(월)~07.19(일) → idx 3..9 (7일)
-                      2주차 = 07.20(월)~07.23(목, 진행중) → idx 10..13 (4일) */
+  /* 막대 14개 = 오늘 포함 최근 14일. 앞 7일 / 최근 7일 두 구간으로 나눠 표시 */
   const bar=(v,i,max)=>{
-    const hot=(i>=11&&v>0);
+    const hot=(i>=7&&v>0);          // 최근 7일 구간을 강조
     const h=v>0?Math.max(4,Math.round(v/max*30)):2; /* 건수 정비례: max건 = 30px */
     return `<span class="bcell" title="${v}건">
       <span class="bv ${hot?'hotv':''}">${v>0?v:'&nbsp;'}</span>
@@ -499,20 +522,23 @@ function renderExec(){
     </span>`;
   };
   $("clusterGrid").innerHTML = CLUSTERS.map(c=>{
-    const w1=c.trend.slice(3,10), w2=c.trend.slice(10,14);
-    const max=Math.max(...w1,...w2,1);
+    const {days, vals} = trendOf(c.id);
+    const w1=vals.slice(0,7), w2=vals.slice(7,14);
+    const max=Math.max(...vals,1);
+    const lbl1=`${md(days[0])}–${md(days[6])}`, lbl2=`${md(days[7])}–${md(days[13])}`;
+    const total=vals.reduce((a,b)=>a+b,0);
     const n = CASES.filter(x=>x.cluster===c.id).length;
     const p = CASES.filter(x=>x.cluster===c.id).reduce((a,x)=>a+x.posts,0);
     return `<div class="cl ${c.fw?'fw':''}" onclick="gotoCluster('${c.id}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter')gotoCluster('${c.id}')">
       <div class="top"><div><h3>${c.name}</h3><div class="code">${c.id} · ${c.code}</div></div>${sevChip(c.sev)}</div>
       <div class="meta">${c.fw?'<span class="chip c-fw">P0 후보 · 48h 급증</span>':''}${c.unv?'<span class="chip c-unv">UNVERIFIED</span>':''}${c.plat?'<span class="chip c-plat">PLATFORM_WIDE_SUSPECT</span>':''}</div>
-      <div class="bars" aria-label="일별 추이 2026-07-13부터 07-23">
-        <div class="grp" style="flex:7">${w1.map((v,i)=>bar(v,i+3,max)).join("")}</div>
+      <div class="bars" aria-label="최근 14일 일별 추이 ${lbl1}부터 ${lbl2}">
+        <div class="grp" style="flex:7">${w1.map((v,i)=>bar(v,i,max)).join("")}</div>
         <span class="sep"></span>
-        <div class="grp" style="flex:4">${w2.map((v,i)=>bar(v,i+10,max)).join("")}</div>
+        <div class="grp" style="flex:7">${w2.map((v,i)=>bar(v,i+7,max)).join("")}</div>
       </div>
-      <div class="wk"><span style="flex:7">1주차 07.13(월)–19(일)</span><span style="flex:4">2주차 07.20–23</span></div>
-      <div class="stat"><span>고유 사례 ${n} · 관찰 게시글 ${p}+</span><span>일별 집계 · 검증일 07.23</span></div>
+      <div class="wk"><span style="flex:7">${lbl1}</span><span style="flex:7">${lbl2} (오늘)</span></div>
+      <div class="stat"><span>고유 사례 ${n} · 관찰 게시글 ${p}+</span><span>${CLUSTER_DAILY?`최근 14일 제보 ${total}건`:'일별 집계 · 스냅샷'}</span></div>
     </div>`;
   }).join("");
 
@@ -750,12 +776,21 @@ function computeKPIs(){
 
 async function loadLive(){
   try{
-    const [cs, cl, runs] = await Promise.all([
+    const [cs, cl, runs, daily] = await Promise.all([
       sbGet("cases?select=*&order=sev.desc,last_seen.desc"),
       sbGet("clusters?select=*"),
-      sbGet("collection_runs?select=finished,started&order=run_id.desc&limit=1")
+      sbGet("collection_runs?select=finished,started&order=run_id.desc&limit=1"),
+      sbGet("cluster_daily?select=*").catch(()=>null)   // 뷰가 없어도 나머지는 동작
     ]);
     if(!cs.length) throw new Error("사례 0건");
+
+    /* 클러스터별 일자별 집계 → { "CL-FW": { "2026-07-20": 3, … } } */
+    if(Array.isArray(daily)){
+      CLUSTER_DAILY = {};
+      for(const r of daily){
+        (CLUSTER_DAILY[r.cluster_id] ||= {})[r.day] = r.n;
+      }
+    }
 
     CASES = cs.map(mapCase);
     /* 클러스터: DB에는 화면용 code/trend가 없으므로 SEED 정의를 유지하되 DB에만 있는 항목을 추가 */
@@ -771,6 +806,7 @@ async function loadLive(){
     setStatus("OFFLINE", null, CASES.length);
   }
   /* 성공·실패 무관하게 항상 렌더링 */
+  $("footDate").textContent = ymdKST(new Date()).replace(/-/g, ".");
   computeKPIs();
   fillOptions(); renderExec(); render();
   replaceHash(location.hash||"#exec");

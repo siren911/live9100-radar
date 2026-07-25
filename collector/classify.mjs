@@ -222,7 +222,22 @@ for (const post of posts) {
 
   meta.s2 = s2;
   const validEvid = EVID_KEYS.includes(s2.evidence) ? s2.evidence : 'u';
-  const validCluster = clusters.some(c => c.id === s2.cluster) ? s2.cluster : null;
+  // 클러스터: AI 응답 우선, 비었으면 카테고리 기준으로 자동 배정
+  // (미지정 사례는 대시보드 추이 그래프 집계에서 누락되므로 반드시 채운다)
+  const CAT_TO_CLUSTER = {
+    G1: 'CL-FW',  A5: 'CL-FW',
+    C1: 'CL-STAB', A4: 'CL-STAB', G3: 'CL-STAB',
+    H1: 'CL-G5',  H13: 'CL-G5',
+    E1: 'CL-Z890', H4: 'CL-Z890',
+    E4: 'CL-RW',  K: 'CL-RW',
+  };
+  const catKey = CATS[s2.cat] ? s2.cat : 'K';
+  const fallbackCluster = catKey === 'A1'
+    ? (s2.fw1b ? 'CL-FW' : 'CL-G5')      // BIOS 미인식: 펌웨어 연관이면 FW, 아니면 플랫폼
+    : (CAT_TO_CLUSTER[catKey] || null);
+  const aiCluster = clusters.some(c => c.id === s2.cluster) ? s2.cluster : null;
+  const validCluster = aiCluster
+    || (clusters.some(c => c.id === fallbackCluster) ? fallbackCluster : null);
 
   if (s2.match && cases.some(c => c.id === s2.match)) {
     // 기존 사례에 병합
