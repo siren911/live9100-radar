@@ -50,10 +50,13 @@ const REDDIT_QUERIES = [
   '"9100 pro"',
 ];
 
-// Samsung Community 공개 검색 (robots.txt: 검색 경로 허용 · Crawl-delay 5 준수)
-// ※ 서버 렌더링 HTML을 파싱. RSS(/rss/board)는 빈 피드로 확인되어 미사용 (2026-07 검증)
+// Samsung Community — Khoros 공개 REST API (api/2.0/search, LiQL)
+// ※ 2026-07-26경부터 HTML 검색 페이지에 Cloudflare 봇 검문이 걸려 조회 0건이 됨.
+//   공식 API 경로는 검문 없이 열려 있고(2026-07-28 검증), 답글까지 개별 메시지로 반환
+//   → 스레드 첫 글만 잡히던 HTML 방식보다 커버리지가 오히려 넓다 (10건 → 26건+).
+// ※ 구문 검색은 안쪽 큰따옴표 필수: MATCHES '"9100 pro"' (없으면 'pro' 토큰이 전부 매칭됨)
 const SAMSUNG_BASE = 'https://us.community.samsung.com';
-const SAMSUNG_QUERIES = ['9100 PRO'];
+const SAMSUNG_LIQL = `SELECT subject, view_href, post_time, body FROM messages WHERE body MATCHES '"9100 pro"' ORDER BY post_time DESC LIMIT 50`;
 const SAMSUNG_CRAWL_DELAY = 5000;   // robots.txt Crawl-delay: 5
 
 // 뉴스 검색 (Google News RSS · API 키 불필요)
@@ -247,64 +250,38 @@ function parseRss(xml) {
 // ─────────────────────────────────────────────
 // Samsung Community — 공식 커뮤니티 공개 검색 결과 파싱
 // ─────────────────────────────────────────────
-function parseSamsung(html) {
-  const strip = s => (s || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ').trim();
-
-  const out = [];
-  // Khoros 검색 결과 항목 단위로 분할
-  for (const chunk of html.split(/<div class="MessageView lia-message-view-message-search-item/).slice(1)) {
-    const path = (chunk.match(/href="(\/t5\/[^"]*\/(?:m-p|td-p)\/\d+)/) || [])[1];
-    const subjRaw = (chunk.match(/class="message-subject"[\s\S]{0,400}?<a[^>]*>([\s\S]*?)<\/a>/) || [])[1]
-                 || (chunk.match(/<h2[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/) || [])[1];
-    if (!path || !subjRaw) continue;
-    const bodyRaw = (chunk.match(/class="lia-message-body-content"[^>]*>([\s\S]*?)<\/div>/) || [])[1]
-                 || (chunk.match(/class="lia-truncated-body-container"[^>]*>([\s\S]*?)<\/div>/) || [])[1];
-    const dateRaw = (chunk.match(/<span class="local-date">([^<]*)/) || [])[1];
-    let posted = null;
-    if (dateRaw) {                                   // 형식: ‎MM-DD-YYYY
-      const d = dateRaw.replace(/[^\d-]/g, '').match(/^(\d{2})-(\d{2})-(\d{4})$/);
-      if (d) posted = new Date(`${d[3]}-${d[1]}-${d[2]}T00:00:00Z`).toISOString();
-    }
-    out.push({
-      title: strip(subjRaw),
-      link: SAMSUNG_BASE + path.split('?')[0],
-      desc: strip(bodyRaw),
-      pubDate: posted,
-    });
-  }
-  return out;
-}
-
 async function collectSamsung() {
-  console.log('🤖 [Samsung Community] 수집 시작 (공개 검색 · Crawl-delay 5s 준수)');
+  console.log('🤖 [Samsung Community] 수집 시작 (공식 API · Crawl-delay 5s 준수)');
   let fetched = 0, errors = 0;
   const rows = [];
-  for (const q of SAMSUNG_QUERIES) {
-    try {
-      const url = `${SAMSUNG_BASE}/t5/forums/searchpage/tab/message?q=${encodeURIComponent(q)}`;
-      const res = await curlFetch(url);   // Node fetch는 403 차단됨 (Reddit과 동일, 2026-07 검증)
-      if (!res.ok) { console.log(`  ⚠️ "${q}" → HTTP ${res.status}`); errors++; continue; }
-      const items = parseSamsung(await res.text());
-      fetched += items.length;
-      const hit = items.filter(it => PRODUCT_RE.test(`${it.title} ${it.desc}`));
-      console.log(`  🏛 "${q}" → ${items.length}건 중 제품 관련 ${hit.length}건`);
-      for (const it of hit) {
+  try {
+    const url = `${SAMSUNG_BASE}/api/2.0/search?q=${encodeURIComponent(SAMSUNG_LIQL)}`;
+    const res = await curlFetch(url);              // curl 경유 (Node fetch TLS 지문 차단 대비)
+    if (!res.ok) {
+      console.log(`  ⚠️ API 응답 HTTP ${res.status}`); errors++;
+    } else {
+      const data = JSON.parse(await res.text());
+      if (data.status !== 'success') throw new Error(data.message || 'API 오류');
+      const items = data.data.items || [];
+      fetched = items.length;
+      const hit = items.filter(m => PRODUCT_RE.test(`${m.subject} ${stripHtml(m.body || '')}`));
+      console.log(`  🏛 API 조회 ${items.length}건(답글 포함) 중 제품 관련 ${hit.length}건`);
+      for (const m of hit) {
+        const bodyText = stripHtml(m.body || '');
         rows.push({
-          url: it.link, source: 'samsung_community', lang: detectLang(`${it.title} ${it.desc}`),
-          title: it.title.slice(0, 300), excerpt: excerptOf(it.desc),
-          posted_at: it.pubDate, raw_hash: hashOf(it.title, it.desc),
-          meta: { feed: 'Samsung Community US', query: q },
+          url: m.view_href, source: 'samsung_community',
+          lang: detectLang(`${m.subject} ${bodyText}`),
+          title: m.subject.slice(0, 300), excerpt: bodyText.slice(0, 500),
+          posted_at: m.post_time ? new Date(m.post_time).toISOString() : null,
+          raw_hash: hashOf(m.subject, bodyText),
+          meta: { feed: 'Samsung Community US', via: 'khoros-api' },
         });
       }
-    } catch (e) { console.log(`  ⚠️ "${q}" 실패: ${e.message}`); errors++; }
-    await sleep(SAMSUNG_CRAWL_DELAY);
-  }
+    }
+  } catch (e) { console.log(`  ⚠️ 실패: ${e.message}`); errors++; }
+  await sleep(SAMSUNG_CRAWL_DELAY);
   const added = await insertPosts(rows);
-  await recordRun('samsung_community', { fetched, added, errors, note: `queries=${SAMSUNG_QUERIES.length}` });
+  await recordRun('samsung_community', { fetched, added, errors, note: 'via=khoros-api' });
   console.log(`✅ [Samsung Community] 조회 ${fetched}건 → 관련 ${rows.length}건 → 신규 입고 ${added}건\n`);
   return { fetched, added, errors };
 }
