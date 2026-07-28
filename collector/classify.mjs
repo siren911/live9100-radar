@@ -125,7 +125,7 @@ console.log(`💰 이번 달 AI 지출: $${spent.toFixed(4)} / 예산 $${BUDGET}
 if (spent >= BUDGET) { console.error('⛔ 월 예산 초과 — 분류 중단'); process.exit(1); }
 
 // Stage 0 — 분류 안 된 게시글 가져오기 (코드 프리필터)
-const posts = await supaGet(`posts?select=id,url,title,excerpt,lang,posted_at,meta&meta->>s1_rel=is.null&order=id.asc`);
+const posts = await supaGet(`posts?select=id,url,title,excerpt,lang,posted_at,meta,raw_hash&meta->>s1_rel=is.null&order=id.asc`);
 console.log(`\n📥 미분류 게시글: ${posts.length}건`);
 
 // 기존 사례·클러스터 목록 (Stage 2 매칭용)
@@ -165,8 +165,11 @@ for (const post of posts) {
   // 예산 실시간 확인
   if (spent + spentThisRun >= BUDGET) { console.error('⛔ 예산 도달 — 중단'); break; }
 
-  // ── Stage 0.5 — 크로스포스트 중복: 이미 판정한 제목이면 결과 재사용 ──
-  const titleKey = (post.title || '').trim().toLowerCase();
+  // ── Stage 0.5 — 크로스포스트 중복: 제목+본문이 모두 같을 때만 결과 재사용 ──
+  // ※ 제목만으로 판정하면 포럼 스레드의 답글(Re: 동일 제목, 내용은 제각각)이
+  //   전부 첫 글 판정에 묶여버림 → 실패 제보가 '정상 보고' 사례로 오분류됨 (2026-07-28 발견)
+  //   raw_hash = hash(제목+본문)이므로 진짜 크로스포스트(내용 동일)만 캐시에 걸린다.
+  const titleKey = `${(post.title || '').trim().toLowerCase()}|${post.raw_hash || ''}`;
   if (titleCache.has(titleKey)) {
     const cached = titleCache.get(titleKey);
     const meta = { ...post.meta, s1_rel: cached.rel, s1_lang: cached.lang, s1_sym: cached.sym, dup_of: cached.firstPostId };
