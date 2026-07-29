@@ -250,6 +250,61 @@ function parseRss(xml) {
 // ─────────────────────────────────────────────
 // Samsung Community — 공식 커뮤니티 공개 검색 결과 파싱
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// Reddit 댓글 — 사례에 연결된 원글의 공개 댓글 피드({글URL}.rss)
+// ※ 원글보다 댓글에 실제 제보("나도 업데이트 후 사라짐")가 많아 커버리지 핵심.
+//   대상을 '사례 연결 글'로 한정해 요청 수를 통제하고, 확인 주기(24h)로 재방문 억제.
+// ※ RSS 제목은 "/u/사용자명 on ..." 형태 → 사용자명 저장 금지 원칙에 따라
+//   제목을 "Re: 원글제목"으로 치환해 저장 (Samsung 답글과 동일한 규격).
+// ─────────────────────────────────────────────
+const REDDIT_CMT_PER_RUN = 8;      // 실행당 확인할 원글 수 (요청 예절)
+const REDDIT_CMT_RECHECK_H = 24;   // 같은 글 재확인 주기(시간)
+
+async function collectRedditComments() {
+  console.log('🤖 [Reddit 댓글] 수집 시작 (사례 연결 글의 댓글 피드)');
+  let fetched = 0, errors = 0, threads = 0;
+  const rows = [];
+  try {
+    const targets = await (await sb(`posts?select=id,url,title,meta&source=eq.reddit&case_id=not.is.null&order=posted_at.desc.nullslast&limit=30`)).json();
+    const cutoff = new Date(Date.now() - REDDIT_CMT_RECHECK_H * 3600e3).toISOString();
+    const due = targets.filter(p => !(p.meta?.cmt_checked_at) || p.meta.cmt_checked_at < cutoff)
+                       .slice(0, REDDIT_CMT_PER_RUN);
+    threads = due.length;
+    for (const parent of due) {
+      try {
+        const feedUrl = parent.url.replace(/\/?$/, '/') + '.rss';
+        const res = await curlFetch(feedUrl);
+        if (!res.ok) { errors++; console.log(`  ⚠️ #${parent.id} → HTTP ${res.status}`); continue; }
+        const comments = parseAtom(await res.text()).slice(1);   // 첫 entry는 원글
+        fetched += comments.length;
+        for (const c of comments) {
+          const bodyText = stripHtml(c.desc);
+          if (!c.link || !bodyText) continue;
+          rows.push({
+            url: c.link, source: 'reddit_comment',
+            lang: detectLang(bodyText),
+            title: `Re: ${parent.title}`.slice(0, 300),          // 사용자명 미저장
+            excerpt: bodyText.slice(0, 500),
+            posted_at: c.pubDate ? new Date(c.pubDate).toISOString() : null,
+            raw_hash: hashOf(`Re: ${parent.title}`, bodyText),
+            meta: { subreddit: parent.meta?.subreddit, parent_post: parent.id, feed: 'reddit-comments' },
+          });
+        }
+        await sb(`posts?id=eq.${parent.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ meta: { ...parent.meta, cmt_checked_at: new Date().toISOString() } }),
+        });
+        console.log(`  💬 #${parent.id} "${(parent.title || '').slice(0, 42)}" → 댓글 ${comments.length}건`);
+      } catch (e) { errors++; console.log(`  ⚠️ #${parent.id} 실패: ${e.message}`); }
+      await sleep(4000);                                          // 요청 간격 4초
+    }
+  } catch (e) { errors++; console.log(`  ⚠️ 대상 조회 실패: ${e.message}`); }
+  const added = await insertPosts(rows);
+  await recordRun('reddit_comments', { fetched, added, errors, note: `threads=${threads}` });
+  console.log(`✅ [Reddit 댓글] 원글 ${threads}개 확인 → 댓글 ${fetched}건 → 신규 입고 ${added}건\n`);
+  return { fetched, added, errors };
+}
+
 async function collectSamsung() {
   console.log('🤖 [Samsung Community] 수집 시작 (공식 API · Crawl-delay 5s 준수)');
   let fetched = 0, errors = 0;
@@ -370,9 +425,11 @@ const r1 = await collectReddit();
 const r2 = await collectRss();
 const r3 = await collectSamsung();
 const r4 = await collectNews();
+const r5 = await collectRedditComments();   // 사례 연결 글이 늘어난 뒤에 실행 (수집 직후 분류 전이므로 전날 연결분 대상)
 console.log('══════ 수집 요약 ══════');
 console.log(`Reddit  : 조회 ${r1.fetched} / 신규 ${r1.added} / 오류 ${r1.errors}`);
 console.log(`RSS     : 조회 ${r2.fetched} / 신규 ${r2.added} / 오류 ${r2.errors}`);
 console.log(`Samsung : 조회 ${r3.fetched} / 신규 ${r3.added} / 오류 ${r3.errors}`);
 console.log(`News    : 조회 ${r4.fetched} / 신규 ${r4.added} / 오류 ${r4.errors} (프리필터 제외 ${r4.filtered}건)`);
+console.log(`R.댓글  : 조회 ${r5.fetched} / 신규 ${r5.added} / 오류 ${r5.errors}`);
 console.log(`⏱ 소요 ${((Date.now() - t0) / 1000).toFixed(1)}초 — 퇴근!`);
