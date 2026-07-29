@@ -230,8 +230,8 @@ footer{max-width:1240px;margin:10px auto 0;padding:16px 20px 30px;font-size:11px
         <div class="kpi"><div class="lb">누적 관찰 게시글</div><div class="v" id="kpiPosts">–</div><div class="d" id="kpiPostsSub">수동검증 + 자동수집 합산</div></div>
         <div class="kpi"><div class="lb">고유 사례</div><div class="v" id="kpiCases">–</div><div class="d">동일 스레드 내 중복 제외</div></div>
         <div class="kpi crit"><div class="lb">FW 1B2QNXH7 연관</div><div class="v" id="kpiFw">–</div><div class="d">펌웨어 연관 주장 사례</div></div>
-        <div class="kpi crit"><div class="lb">고심각도 (Sev 4+)</div><div class="v" id="kpiSev">–</div><div class="d">사람 검토 대기</div></div>
-        <div class="kpi"><div class="lb">플랫폼 원인 가능성 비중</div><div class="v" id="kpiPlat">–</div><div class="d">보드 BIOS·슬롯·CPU 요인</div></div>
+        <div class="kpi crit"><div class="lb">리스크 P0·P1</div><div class="v" id="kpiSev">–</div><div class="d" id="kpiSevSub">심각도×증거×귀책×확산세</div></div>
+        <div class="kpi"><div class="lb">SSD 귀책 의심 비중</div><div class="v" id="kpiPlat">–</div><div class="d" id="kpiPlatSub">FA 감별 판정 (ssd·복합)</div></div>
         <div class="kpi"><div class="lb">공식·모더레이터 답변</div><div class="v" id="kpiOfficial">–</div><div class="d">evidence = 공식 답변 존재</div></div>
       </div>
     </section>
@@ -484,6 +484,12 @@ function setView(v,push=true){
 }
 
 function sevChip(s){return `<span class="chip c-sev${s}">Sev ${s}</span>`}
+/* ── SSD 귀책 판정 + 리스크 등급 표시 (FA 감별) ── */
+const ATTRIB_KO={ssd:"SSD 귀책 의심",platform:"플랫폼 귀책 의심",mixed:"복합 요인",user_env:"사용자 환경",unknown:"판단 보류"};
+const ATTRIB_CSS={ssd:"background:#3b0d0d;color:#fca5a5;border-color:#7f1d1d",platform:"background:#1e2a3b;color:#93c5fd;border-color:#1e3a8a",mixed:"background:#3b2f0d;color:#fbbf24;border-color:#78350f",user_env:"background:#12291a;color:#86efac;border-color:#14532d",unknown:"background:#26262e;color:#9ca3af;border-color:#3f3f46"};
+const RISK_CSS={P0:"background:#7f1d1d;color:#fff;border-color:#b91c1c;font-weight:700",P1:"background:#7c2d12;color:#fdba74;border-color:#9a3412",WATCH:"background:#3b2f0d;color:#fbbf24;border-color:#78350f",INFO:"background:#26262e;color:#9ca3af;border-color:#3f3f46"};
+function attribChip(c){if(!c.attrib)return"";return `<span class="chip" style="${ATTRIB_CSS[c.attrib]||''}" title="${(c.attribWhy||'')}${c.attribConf?` (확신도 ${Math.round(c.attribConf*100)}%)`:''}">${ATTRIB_KO[c.attrib]||c.attrib}</span>`}
+function riskChip(c){if(!c.riskGrade)return"";return `<span class="chip" style="${RISK_CSS[c.riskGrade]||''}" title="리스크 점수 ${c.riskScore??'–'} = 심각도×증거×귀책×확산세">${c.riskGrade}</span>`}
 function evChip(e){return `<span class="chip c-ev">${EVID[e]}</span>`}
 function fwChip(){return `<span class="chip c-fw">FW 1B2QNXH7</span>`}
 
@@ -606,7 +612,7 @@ function render(){
   $("fcount").textContent=`${rows.length} / ${CASES.length} 사례`;
   $("tbody").innerHTML=rows.map(c=>`<tr class="${c.fw1b?'fwhl':''}" onclick="openDrawer('${c.id}')" tabindex="0" onkeydown="if(event.key==='Enter')openDrawer('${c.id}')">
     <td class="tid">${c.id}<br>${c.cluster}</td>
-    <td class="ttl">${c.title}<div class="tsub">${c.plat}${c.fw1b?' · '+fwChip():''}${c.platWide?' · <span class="chip c-plat">PLATFORM?</span>':''}</div></td>
+    <td class="ttl">${c.title}<div class="tsub">${c.plat}${c.fw1b?' · '+fwChip():''}${c.platWide?' · <span class="chip c-plat">PLATFORM?</span>':''} ${riskChip(c)} ${attribChip(c)}</div></td>
     <td>${c.cat}<div class="tsub">${CATS[c.cat]}</div></td>
     <td>${sevChip(c.sev)}</td>
     <td>${evChip(c.evidence)}</td>
@@ -651,6 +657,11 @@ function openDrawer(id,push=true){
       <span class="k">최근 관찰</span><span class="v mono">${c.date}</span>
       <span class="k">출처 사이트</span><span class="v">${c.qsite||new URL(c.src).hostname}</span>
     </div></div>
+    ${c.attrib?`<div class="dw-sec"><h5>제품 귀책 판단 (FA 감별 · AI 판정)</h5>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">${attribChip(c)}${riskChip(c)}${c.attribConf!=null?`<span class="tsub">확신도 ${Math.round(c.attribConf*100)}% · 리스크 점수 ${c.riskScore??'–'}</span>`:''}</div>
+      ${c.attribWhy?`<p style="font-size:12.5px">${c.attribWhy}</p>`:''}
+      <p class="tsub" style="margin-top:4px">기준: 플랫폼 다양성 · 펌웨어 상관 · 타 시스템 재현 · OS 무관성 등 감별 신호 기반. 미검증 제보에 대한 추정이며 확정 판정이 아닙니다.</p>
+    </div>`:''}
     <div class="dw-sec"><h5>Claims — 주장·관찰·답변 분리 (요지 재서술)</h5>
       ${c.claims.map(cl=>`<div class="claim ${cl.crit?'crit':''}"><div class="ct">${cl.t}</div><p>${cl.txt}</p></div>`).join("")}
     </div>
@@ -725,6 +736,8 @@ function mapCase(r){
     title:r.title, counter:r.counter||"", q:r.q||"", qsite:r.qsite||"", src:r.src,
     demo:!!r.demo,
     fw1b:!!r.fw1b, platWide:!!r.plat_wide,
+    attrib:r.attrib||null, attribConf:r.attrib_conf!=null?Number(r.attrib_conf):null,
+    attribWhy:r.attrib_why||"", riskScore:r.risk_score!=null?Number(r.risk_score):null, riskGrade:r.risk_grade||null,
     posts:r.posts_count ?? 0, date:r.last_seen || "",
     claims:Array.isArray(r.claims)?r.claims:[],
     hyps:Array.isArray(r.hyps)?r.hyps:[]
@@ -772,10 +785,29 @@ function computeKPIs(){
   const n = CASES.length;
   const posts = CASES.reduce((a,c)=>a+(c.posts||0),0);
   const fw = CASES.filter(c=>c.fw1b).length;
-  const sev4 = CASES.filter(c=>c.sev>=4).length;
-  const platCats = ["H1","H4","H13","A5"];
-  const plat = CASES.filter(c=>c.platWide || platCats.includes(c.cat)).length;
   const official = CASES.filter(c=>c.evidence==="o").length;
+  /* 리스크 P0·P1 (귀책·확산 반영) — 판정 전이면 Sev4+ 폴백 */
+  const hasRisk = CASES.some(c=>c.riskGrade);
+  const sev4 = hasRisk
+    ? CASES.filter(c=>c.riskGrade==="P0"||c.riskGrade==="P1").length
+    : CASES.filter(c=>c.sev>=4).length;
+  if(hasRisk){
+    const p0=CASES.filter(c=>c.riskGrade==="P0").length;
+    $("kpiSevSub").textContent = `P0 ${p0}건 · P1 ${sev4-p0}건 (귀책·확산 반영)`;
+  } else { $("kpiSevSub").textContent = "고심각도 Sev 4+ (리스크 판정 전)"; }
+  /* SSD 귀책 의심 비중 — FA 감별 판정 기반, 판정 전이면 기존 휴리스틱 */
+  const judged = CASES.filter(c=>c.attrib && c.attrib!=="unknown");
+  let plat;
+  if(judged.length){
+    plat = CASES.filter(c=>c.attrib==="ssd"||c.attrib==="mixed").length;
+    $("kpiPlatSub").textContent = `ssd·복합 ${plat}건 / 판정 ${judged.length}건 (보류 ${CASES.length-judged.length})`;
+    $("kpiPlat").textContent = Math.round(plat/judged.length*100)+"%";
+  } else {
+    const platCats = ["H1","H4","H13","A5"];
+    plat = CASES.filter(c=>c.platWide || platCats.includes(c.cat)).length;
+    $("kpiPlat").textContent = CASES.length ? Math.round(plat/CASES.length*100)+"%" : "–";
+    $("kpiPlatSub").textContent = "카테고리 휴리스틱 (판정 전)";
+  }
   $("kpiPosts").textContent = posts;
   if(CLUSTER_DAILY){
     const auto = Object.values(CLUSTER_DAILY).reduce((a,m)=>a+Object.values(m).reduce((x,y)=>x+y,0),0);
@@ -784,7 +816,6 @@ function computeKPIs(){
   $("kpiCases").textContent = n;
   $("kpiFw").textContent = fw;
   $("kpiSev").textContent = sev4;
-  $("kpiPlat").textContent = n ? Math.round(plat/n*100)+"%" : "–";
   $("kpiOfficial").textContent = official;
 }
 
